@@ -105,6 +105,9 @@ def test(data,
         names = model.names if hasattr(model, 'names') else model.module.names
     except:
         names = load_classes(opt.names)
+    class_labels = {}
+    for index, image in enumerate(names):
+        class_labels[index] = image
     coco91class = coco80_to_coco91_class()
     s = ('%20s' + '%12s' * 6) % ('Class', 'Images', 'Targets', 'P', 'R', 'mAP@.5', 'mAP@.5:.95')
     p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
@@ -165,7 +168,7 @@ def test(data,
                              "box_caption": "%s %.3f" % (names[int(cls)], conf),
                              "scores": {"class_score": conf},
                              "domain": "pixel"} for *xyxy, conf, cls in pred.tolist()]
-                boxes = {"predictions": {"box_data": box_data, "class_labels": names}}
+                boxes = {"predictions": {"box_data": box_data, "class_labels": class_labels}}
                 wandb_images.append(wandb.Image(img[si], boxes=boxes, caption=path.name))
 
             # Clip boxes to image bounds

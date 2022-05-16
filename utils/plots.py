@@ -95,6 +95,8 @@ def output_to_target(output, width, height):
     for i, o in enumerate(output):
         if o is not None:
             for pred in o:
+                if isinstance(pred, torch.Tensor):
+                    pred = pred.cpu().numpy()
                 box = pred[:4]
                 w = (box[2] - box[0]) / width
                 h = (box[3] - box[1]) / height
