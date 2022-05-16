@@ -1,15 +1,16 @@
 import argparse
 
 import torch
-
-from utils.google_utils import attempt_download
+import models
+#from utils.google_utils import attempt_download
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', type=str, default='./yolov4-csp.pt', help='weights path')
     parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='image size')
-    parser.add_argument('--channels', type=int, default=3, help='image channels')
     parser.add_argument('--batch-size', type=int, default=1, help='batch size')
+    parser.add_argument('--cfg', type=str, default='cfg/yolov4.cfg', help='*.cfg path')
+    parser.add_argument('--channels', type=int, default=3, help='batch size')
     opt = parser.parse_args()
     opt.img_size *= 2 if len(opt.img_size) == 1 else 1  # expand
     print(opt)
@@ -18,22 +19,18 @@ if __name__ == '__main__':
     img = torch.zeros((opt.batch_size, opt.channels, *opt.img_size))  # image size(1,3,320,192) iDetection
 
     # Load PyTorch model
-    attempt_download(opt.weights)
-    model = torch.load(opt.weights, map_location=torch.device('cpu'))['model'].float()
+    #attempt_download(opt.weights)
+    models.ONNX_EXPORT = True
+    model = models.Darknet(opt.cfg)
+    model.load_state_dict(torch.load(opt.weights, map_location=torch.device('cpu'))['model'])
     model.eval()
-    model.model[-1].export = True  # set Detect() layer export=True
+    #model = #.float()
+    #print(model)
+    #model.eval()
+    model.export = True  # set Detect() layer export=True
     y = model(img)  # dry run
 
-    # TorchScript export
-    try:
-        print('\nStarting TorchScript export with torch %s...' % torch.__version__)
-        f = opt.weights.replace('.pt', '.torchscript.pt')  # filename
-        ts = torch.jit.trace(model, img)
-        ts.save(f)
-        print('TorchScript export success, saved as %s' % f)
-    except Exception as e:
-        print('TorchScript export failure: %s' % e)
-
+   
     # ONNX export
     try:
         import onnx
@@ -52,18 +49,6 @@ if __name__ == '__main__':
     except Exception as e:
         print('ONNX export failure: %s' % e)
 
-    # CoreML export
-    try:
-        import coremltools as ct
-
-        print('\nStarting CoreML export with coremltools %s...' % ct.__version__)
-        # convert model from torchscript and apply pixel scaling as per detect.py
-        model = ct.convert(ts, inputs=[ct.ImageType(name='images', shape=img.shape, scale=1 / 255.0, bias=[0, 0, 0])])
-        f = opt.weights.replace('.pt', '.mlmodel')  # filename
-        model.save(f)
-        print('CoreML export success, saved as %s' % f)
-    except Exception as e:
-        print('CoreML export failure: %s' % e)
 
     # Finish
     print('\nExport complete. Visualize with https://github.com/lutzroeder/netron.')
