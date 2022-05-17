@@ -450,6 +450,7 @@ class Darknet(nn.Module):
         super(Darknet, self).__init__()
 
         self.module_defs = parse_model_cfg(cfg)
+        self.channels = self.module_defs['net']['channels']
         self.module_list, self.routs = create_modules(self.module_defs, img_size, cfg)
         self.yolo_layers = get_yolo_layers(self)
         # torch_utils.initialize_weights(self)

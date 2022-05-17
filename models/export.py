@@ -13,7 +13,6 @@ if __name__ == '__main__':
     parser.add_argument('--channels', type=int, default=3, help='batch size')
     opt = parser.parse_args()
     opt.img_size *= 2 if len(opt.img_size) == 1 else 1  # expand
-    print(opt)
 
     # Input
     img = torch.zeros((opt.batch_size, opt.channels, *opt.img_size))  # image size(1,3,320,192) iDetection
@@ -21,7 +20,7 @@ if __name__ == '__main__':
     # Load PyTorch model
     #attempt_download(opt.weights)
     models.ONNX_EXPORT = True
-    model = models.Darknet(opt.cfg)
+    model = models.Darknet(opt.cfg).to("cpu")
     model.load_state_dict(torch.load(opt.weights, map_location=torch.device('cpu'))['model'])
     model.eval()
     #model = #.float()
