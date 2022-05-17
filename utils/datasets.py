@@ -81,13 +81,12 @@ def create_dataloader(path, imgsz, batch_size, stride, opt, hyp=None, augment=Fa
                                     num_workers=nw,
                                     sampler=sampler,
                                     pin_memory=True,
-                                    collate_fn=LoadImagesAndLabels.collate_fn,
-                                      channels=channels)  # torch.utils.data.DataLoader()
+                                    collate_fn=LoadImagesAndLabels.collate_fn) # torch.utils.data.DataLoader()
     return dataloader, dataset
 
 
 def create_dataloader9(path, imgsz, batch_size, stride, opt, hyp=None, augment=False, cache=False, pad=0.0, rect=False,
-                      rank=-1, world_size=1, workers=8):
+                      rank=-1, world_size=1, workers=8,channels=3):
     # Make sure only the first process in DDP process the dataset first, and the following others can use the cache
     with torch_distributed_zero_first(rank):
         dataset = LoadImagesAndLabels9(path, imgsz, batch_size,
@@ -98,7 +97,8 @@ def create_dataloader9(path, imgsz, batch_size, stride, opt, hyp=None, augment=F
                                       single_cls=opt.single_cls,
                                       stride=int(stride),
                                       pad=pad,
-                                      rank=rank)
+                                      rank=rank,
+                                      channels=channels)
 
     batch_size = min(batch_size, len(dataset))
     nw = min([os.cpu_count() // world_size, batch_size if batch_size > 1 else 0, workers])  # number of workers
@@ -480,7 +480,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                     if self.channels == 1:
                         img = cv2.imread(str(p),cv2.IMREAD_GRAYSCALE)
                     else:
-                        img = cv2.imread(str(p)
+                        img = cv2.imread(str(p))
                     h, w = img.shape[:2]
                     for j, x in enumerate(l):
                         f = '%s%sclassifier%s%g_%g_%s' % (p.parent.parent, os.sep, os.sep, x[0], j, p.name)
@@ -512,7 +512,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         if cache_images:
             gb = 0  # Gigabytes of cached images
             self.img_hw0, self.img_hw = [None] * n, [None] * n
-            results = ThreadPool(8).imap(lambda x: load_image(*x,channels=self.channels)), zip(repeat(self), range(n)))  # 8 threads
+            results = ThreadPool(8).imap(lambda x: load_image(*x,channels=self.channels), zip(repeat(self), range(n)))  # 8 threads
             pbar = tqdm(enumerate(results), total=n)
             for i, x in pbar:
                 self.imgs[i], self.img_hw0[i], self.img_hw[i] = x  # img, hw_original, hw_resized = load_image(self, i)
