@@ -214,7 +214,10 @@ class LoadImages:  # for inference
         img = letterbox(img0, new_shape=self.img_size, auto_size=self.auto_size)[0]
 
         # Convert
-        img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
+        if self.channels == 1:
+            img = np.expand_dims(img,axis=0)
+        else:
+            img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
         img = np.ascontiguousarray(img)
 
         return path, img, img0, self.cap
@@ -276,7 +279,10 @@ class LoadWebcam:  # for inference
         img = letterbox(img0, new_shape=self.img_size)[0]
 
         # Convert
-        img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
+        if self.channels == 1:
+            img = np.expand_dims(img,axis=0)
+        else:
+            img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
         img = np.ascontiguousarray(img)
 
         return img_path, img, img0, None
@@ -512,7 +518,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         if cache_images:
             gb = 0  # Gigabytes of cached images
             self.img_hw0, self.img_hw = [None] * n, [None] * n
-            results = ThreadPool(8).imap(lambda x: load_image(*x,channels=self.channels), zip(repeat(self), range(n)))  # 8 threads
+            results = ThreadPool(8).imap(lambda x: load_image(*x), zip(repeat(self), range(n)))  # 8 threads
             pbar = tqdm(enumerate(results), total=n)
             for i, x in pbar:
                 self.imgs[i], self.img_hw0[i], self.img_hw[i] = x  # img, hw_original, hw_resized = load_image(self, i)
@@ -574,7 +580,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
 
         else:
             # Load image
-            img, (h0, w0), (h, w) = load_image(self,channels=self.channels)
+            img, (h0, w0), (h, w) = load_image(self)
             
             # Letterbox
             shape = self.batch_shapes[self.batch[index]] if self.rect else self.img_size  # final letterboxed shape
@@ -806,7 +812,7 @@ class LoadImagesAndLabels9(Dataset):  # for training/testing
         if cache_images:
             gb = 0  # Gigabytes of cached images
             self.img_hw0, self.img_hw = [None] * n, [None] * n
-            results = ThreadPool(8).imap(lambda x: load_image(*x,channels=self.channels), zip(repeat(self), range(n)))  # 8 threads
+            results = ThreadPool(8).imap(lambda x: load_image(*x), zip(repeat(self), range(n)))  # 8 threads
             pbar = tqdm(enumerate(results), total=n)
             for i, x in pbar:
                 self.imgs[i], self.img_hw0[i], self.img_hw[i] = x  # img, hw_original, hw_resized = load_image(self, i)
@@ -868,7 +874,7 @@ class LoadImagesAndLabels9(Dataset):  # for training/testing
 
         else:
             # Load image
-            img, (h0, w0), (h, w) = load_image(self, index,self.channels)
+            img, (h0, w0), (h, w) = load_image(self, index)
 
             # Letterbox
             shape = self.batch_shapes[self.batch[index]] if self.rect else self.img_size  # final letterboxed shape
@@ -927,7 +933,10 @@ class LoadImagesAndLabels9(Dataset):  # for training/testing
             labels_out[:, 1:] = torch.from_numpy(labels)
 
         # Convert
-        img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
+        if self.channels == 1:
+            img = np.expand_dims(img,axis=0)
+        else:
+            img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
         img = np.ascontiguousarray(img)
 
         return torch.from_numpy(img), labels_out, self.img_files[index], shapes
@@ -941,13 +950,13 @@ class LoadImagesAndLabels9(Dataset):  # for training/testing
 
 
 # Ancillary functions --------------------------------------------------------------------------------------------------
-def load_image(self, index, channels):
+def load_image(self, index):
     # loads 1 image from dataset, returns img, original hw, resized hw
     img = self.imgs[index]
     if img is None:  # not cached
         path = self.img_files[index]
-        if channels == 1:
-            img = cv2.imread(path,cv.IMREAD_GRAYSCALE)  
+        if self.channels == 1:
+            img = cv2.imread(path,cv2.IMREAD_GRAYSCALE)  
         else:
             img = cv2.imread(path)
         assert img is not None, 'Image Not Found ' + path
@@ -980,7 +989,7 @@ def augment_hsv(img, hgain=0.5, sgain=0.5, vgain=0.5):
     #         img[:, :, i] = cv2.equalizeHist(img[:, :, i])
 
 
-def load_mosaic(self, index,channels=3):
+def load_mosaic(self, index):
     # loads images in a mosaic
 
     labels4 = []
@@ -989,11 +998,11 @@ def load_mosaic(self, index,channels=3):
     indices = [index] + [random.randint(0, len(self.labels) - 1) for _ in range(3)]  # 3 additional image indices
     for i, index in enumerate(indices):
         # Load image
-        img, _, (h, w) = load_image(self, index,channels)
+        img, _, (h, w) = load_image(self, index)
 
         # place img in img4
         if i == 0:  # top left
-            if channels == 1:
+            if self.channels == 1:
                 img4 = np.full((s * 2, s * 2), 114, dtype=np.uint8)  # base image with 4 tiles
             else:
                 img4 = np.full((s * 2, s * 2, img.shape[2]), 114, dtype=np.uint8)
@@ -1041,7 +1050,7 @@ def load_mosaic(self, index,channels=3):
     return img4, labels4
 
 
-def load_mosaic9(self, index,channels=3):
+def load_mosaic9(self, index):
     # loads images in a 9-mosaic
 
     labels9 = []
@@ -1054,7 +1063,7 @@ def load_mosaic9(self, index,channels=3):
 
         # place img in img9
         if i == 0:  # center
-            if channels == 1:
+            if self.channels == 1:
                 img9 = np.full((s * 3, s * 3), 114, dtype=np.uint8)  # base image with 4 tiles
             else:
                 img9 = np.full((s * 3, s * 3, img.shape[2]), 114, dtype=np.uint8)  # base image with 4 tiles
